@@ -1,0 +1,33 @@
+inputSet:
+  name: PR Trigger Input
+  identifier: PR_Trigger_Input
+  orgIdentifier: avyka_assets
+  projectIdentifier: heartflow_assets
+  pipeline:
+    identifier: dynamicprprovisioner
+    stages:
+      - stage:
+          identifier: Deploy_to_Dev
+          type: Deployment
+          spec:
+            service:
+              serviceInputs:
+                serviceDefinition:
+                  type: Kubernetes
+                  spec:
+                    artifacts:
+                      primary:
+                        primaryArtifactRef: battleship
+                        sources:
+                          - identifier: battleship
+                            type: Ecr
+                            spec:
+                              tag: v0.0.9
+            environment:
+              infrastructureDefinitions:
+                - identifier: Dev
+                  inputs:
+                    identifier: Dev
+                    type: KubernetesDirect
+                    spec:
+                      provisioner: Create_Namespace
