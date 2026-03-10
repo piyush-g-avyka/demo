@@ -1,0 +1,89 @@
+pipeline:
+  name: dynamic-pr-provisioner
+  identifier: dynamicprprovisioner
+  projectIdentifier: heartflow_assets
+  orgIdentifier: avyka_assets
+  tags: {}
+  stages:
+    - stage:
+        name: Deploy to Dev
+        identifier: Deploy_to_Dev
+        description: ""
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: deployment_service
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: <+input>
+                      sources: <+input>
+          environment:
+            environmentRef: Dev
+            deployToAll: false
+            provisioner:
+              steps:
+                - step:
+                    type: ShellScriptProvision
+                    name: Create Namespace
+                    identifier: Create_Namespace
+                    spec:
+                      source:
+                        type: Inline
+                        spec:
+                          script: |-
+                            # Create the dynamic name
+                            export DYNAMIC_NS="demo-service-pr-<+trigger.prNumber>"
+
+                            # K8s Command
+                            kubectl create namespace $DYNAMIC_NS --dry-run=client -o yaml | kubectl apply -f -
+
+                            # HARNESS MAGIC: Export the variable so the Infrastructure can "Map" it
+                            # This creates an output variable named 'new_ns'
+                            export new_ns=$DYNAMIC_NS
+                      environmentVariables: []
+                    timeout: 10m
+              rollbackSteps: []
+            infrastructureDefinitions:
+              - identifier: Dev
+                inputs:
+                  identifier: Dev
+                  type: KubernetesDirect
+                  spec:
+                    provisioner: <+input>
+          execution:
+            steps:
+              - step:
+                  name: Stage Deployment
+                  identifier: stageDeployment
+                  type: K8sBlueGreenDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+              - step:
+                  name: Swap primary with stage service
+                  identifier: bgSwapServices
+                  type: K8sBGSwapServices
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+            rollbackSteps:
+              - step:
+                  name: Swap primary with stage service
+                  identifier: rollbackBgSwapServices
+                  type: K8sBGSwapServices
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
