@@ -76,6 +76,9 @@ pipeline:
                   spec:
                     skipDryRun: false
                     pruningEnabled: false
+                    skipUnchangedManifest: false
+                    delegateSelectors:
+                      - kubernetes-delegate
               - step:
                   name: Swap primary with stage service
                   identifier: bgSwapServices
@@ -83,6 +86,8 @@ pipeline:
                   timeout: 10m
                   spec:
                     skipDryRun: false
+                    delegateSelectors:
+                      - kubernetes-delegate
             rollbackSteps:
               - step:
                   name: Swap primary with stage service
@@ -98,3 +103,35 @@ pipeline:
                 - AllErrors
               action:
                 type: StageRollback
+        when:
+          pipelineStatus: Success
+          condition: <+trigger.event> != "PULL_REQUEST_CLOSED"
+    - stage:
+        name: Cleanup namespace
+        identifier: Cleanup_namespace
+        description: ""
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: ShellScript
+                  name: ShellScript_1
+                  identifier: ShellScript_1
+                  spec:
+                    shell: Bash
+                    executionTarget: {}
+                    source:
+                      type: Inline
+                      spec:
+                        script: |-
+                          PR_NUM="<+trigger.prNumber>"
+                          echo "Cleaning up dynamic environment for PR $PR_NUM"
+                          kubectl delete namespace "demo-service-pr-$PR_NUM" --ignore-not-found=true
+                    environmentVariables: []
+                    outputVariables: []
+                  timeout: 10m
+        tags: {}
+        when:
+          pipelineStatus: Success
+          condition: <+trigger.event> == "PULL_REQUEST_CLOSED"
