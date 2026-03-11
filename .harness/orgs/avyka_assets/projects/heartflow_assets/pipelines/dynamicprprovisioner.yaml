@@ -36,15 +36,26 @@ pipeline:
                         type: Inline
                         spec:
                           script: |-
-                            # Create the dynamic name
-                            export DYNAMIC_NS="demo-service-pr-<+trigger.prNumber>"
+                            # 1. Capture the PR Number from the trigger
+                            PR_NUM="<+trigger.prNumber>"
 
-                            # K8s Command
-                            kubectl create namespace $DYNAMIC_NS --dry-run=client -o yaml | kubectl apply -f -
+                            # 2. Construct the dynamic namespace name
+                            export DYNAMIC_NS="demo-service-pr-$PR_NUM"
 
-                            # HARNESS MAGIC: Export the variable so the Infrastructure can "Map" it
-                            # This creates an output variable named 'new_ns'
-                            export new_ns=$DYNAMIC_NS
+                            # 3. Check if namespace exists, if not, create it
+                            if kubectl get namespace "$DYNAMIC_NS" > /dev/null 2>&1; then
+                              echo "Namespace $DYNAMIC_NS already exists. Skipping creation."
+                            else
+                              echo "Namespace $DYNAMIC_NS not found. Creating it now..."
+                              kubectl create namespace "$DYNAMIC_NS"
+                            fi
+
+                            # 4. HARNESS MAGIC: Write to the output path in JSON format
+                            # This must run EVERY time (even if the namespace already existed) 
+                            # so the Infrastructure Mapping always has a value to read.
+                            echo "{\"new_ns\": \"$DYNAMIC_NS\"}" > "$PROVISIONER_OUTPUT_PATH"
+
+                            echo "Namespace name successfully exported to Harness: $DYNAMIC_NS"
                       environmentVariables: []
                     timeout: 10m
               rollbackSteps: []
