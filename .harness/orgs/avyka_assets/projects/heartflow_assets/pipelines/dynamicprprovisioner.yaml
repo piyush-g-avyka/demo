@@ -134,4 +134,4 @@ pipeline:
         tags: {}
         when:
           pipelineStatus: Success
-          condition: <+trigger.event> == "PULL_REQUEST_CLOSED"
+          condition: <+trigger.payload.action> == "closed"
